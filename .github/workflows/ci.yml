@@ -4,10 +4,18 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: disco-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   api-tests:
     name: API Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, yoyaku-ci]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,7 +31,8 @@ jobs:
 
   pipeline-tests:
     name: Pipeline Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, yoyaku-ci]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,7 +46,8 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, yoyaku-ci]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,7 +67,8 @@ jobs:
 
   e2e-tests:
     name: E2E (Playwright vs vite preview)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, yoyaku-ci]
+    timeout-minutes: 25
     needs: frontend-tests
     steps:
       - uses: actions/checkout@v4
@@ -75,9 +86,12 @@ jobs:
         run: npm ci
       - name: Install API deps (required by playwright.config webServer)
         run: pip install fastapi uvicorn httpx requests requests-oauthlib pydantic
-      - name: Install Playwright browsers
+      - name: Install Playwright browser
+        # System libraries are pre-provisioned by the runner image; only the
+        # browser binary is fetched into the unprivileged runner cache. `--with-deps`
+        # would need sudo, which the runner user does not have by design.
         working-directory: packages/web
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Build web
         working-directory: packages/web
         run: npm run build
